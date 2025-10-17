@@ -1,0 +1,178 @@
+// Snake - jogo simples em JavaScript
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const scoreEl = document.getElementById('score');
+const finalScoreEl = document.getElementById('finalScore');
+const overlay = document.getElementById('overlay');
+const restartBtn = document.getElementById('restart');
+const overlayRestart = document.getElementById('overlayRestart');
+const speedSelect = document.getElementById('speed');
+
+const tileSize = 20; // tamanho em px de cada célula
+const tileCount = canvas.width / tileSize; // assume canvas quadrado
+
+let snake = [{x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)}];
+let vx = 0, vy = 0;
+let food = spawnFood();
+let score = 0;
+let gameInterval = null;
+let fps = parseInt(speedSelect.value, 10) || 8;
+let isGameOver = false;
+
+// Inicializa
+updateScore();
+startGame();
+
+function startGame(){
+  clearInterval(gameInterval);
+  fps = parseInt(speedSelect.value, 10) || 8;
+  gameInterval = setInterval(gameLoop, 1000 / fps);
+  isGameOver = false;
+  overlay.classList.add('hidden');
+}
+
+function gameLoop(){
+  update();
+  draw();
+}
+
+function update(){
+  // atualiza posição
+  const head = { x: snake[0].x + vx, y: snake[0].y + vy };
+
+  // colisão parede
+  if(head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount){
+    endGame();
+    return;
+  }
+
+  // colisão em si mesmo
+  for(let i=0;i<snake.length;i++){
+    if(snake[i].x === head.x && snake[i].y === head.y){
+      endGame();
+      return;
+    }
+  }
+
+  snake.unshift(head); // adiciona nova cabeça
+
+  // comer comida?
+  if(head.x === food.x && head.y === food.y){
+    score += 1;
+    updateScore();
+    // aumenta velocidade ligeiramente
+    fps = Math.min(24, fps + 0.25);
+    clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop, 1000 / fps);
+    food = spawnFood();
+  } else {
+    snake.pop(); // remove cauda se não comeu
+  }
+}
+
+function draw(){
+  // fundo
+  ctx.fillStyle = '#061220';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // grid leve opcional
+  ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+  for(let i=0;i<=tileCount;i++){
+    // linhas verticais
+    ctx.beginPath();
+    ctx.moveTo(i*tileSize,0);
+    ctx.lineTo(i*tileSize,canvas.height);
+    ctx.stroke();
+    // linhas horizontais
+    ctx.beginPath();
+    ctx.moveTo(0,i*tileSize);
+    ctx.lineTo(canvas.width,i*tileSize);
+    ctx.stroke();
+  }
+
+  // desenha comida
+  drawCell(food.x, food.y, '#ef4444');
+
+  // desenha cobra
+  for(let i=0;i<snake.length;i++){
+    // cabeça em destaque
+    drawCell(snake[i].x, snake[i].y, i === 0 ? '#22c55e' : '#16a34a');
+  }
+}
+
+function drawCell(x,y,color){
+  ctx.fillStyle = color;
+  ctx.fillRect(x*tileSize + 1, y*tileSize + 1, tileSize-2, tileSize-2);
+  // leve contorno
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.strokeRect(x*tileSize + 1, y*tileSize + 1, tileSize-2, tileSize-2);
+}
+
+function spawnFood(){
+  // encontra posição que não esteja ocupada pela cobra
+  while(true){
+    const fx = Math.floor(Math.random() * tileCount);
+    const fy = Math.floor(Math.random() * tileCount);
+    let coll = false;
+    for(const s of snake){
+      if(s.x === fx && s.y === fy){ coll = true; break; }
+    }
+    if(!coll) return {x: fx, y: fy};
+  }
+}
+
+function updateScore(){
+  scoreEl.textContent = score;
+}
+
+function endGame(){
+  isGameOver = true;
+  clearInterval(gameInterval);
+  finalScoreEl.textContent = score;
+  overlay.classList.remove('hidden');
+}
+
+// controles teclado
+window.addEventListener('keydown', (e) => {
+  if(isGameOver) return;
+  const key = e.key;
+  // previne inversão direta
+  if((key === 'ArrowUp' || key === 'w' || key === 'W') && vy !== 1){ vx = 0; vy = -1; }
+  else if((key === 'ArrowDown' || key === 's' || key === 'S') && vy !== -1){ vx = 0; vy = 1; }
+  else if((key === 'ArrowLeft' || key === 'a' || key === 'A') && vx !== 1){ vx = -1; vy = 0; }
+  else if((key === 'ArrowRight' || key === 'd' || key === 'D') && vx !== -1){ vx = 1; vy = 0; }
+});
+
+// botões UI
+restartBtn.addEventListener('click', () => {
+  resetGame();
+  startGame();
+});
+
+overlayRestart.addEventListener('click', () => {
+  resetGame();
+  startGame();
+});
+
+speedSelect.addEventListener('change', () => {
+  // altera a velocidade e reinicia intervalo atual
+  const selected = parseInt(speedSelect.value, 10) || 8;
+  fps = selected;
+  if(!isGameOver){
+    clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop, 1000 / fps);
+  }
+});
+
+function resetGame(){
+  snake = [{x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)}];
+  vx = 0; vy = 0;
+  food = spawnFood();
+  score = 0;
+  updateScore();
+  isGameOver = false;
+  fps = parseInt(speedSelect.value, 10) || 8;
+  clearInterval(gameInterval);
+  gameInterval = setInterval(gameLoop, 1000 / fps);
+}
